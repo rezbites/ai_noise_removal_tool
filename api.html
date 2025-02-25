@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Noise Removal Tool</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>AI Noise Removal Tool</h1>
+            <p>Upload, clean, and enhance your images with AI technology</p>
+        </header>
+
+        <main>
+            <section class="upload-section">
+                <div class="upload-container" id="upload-container">
+                    <div class="upload-icon">
+                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                    </div>
+                    <p>Drag & drop your image here or <span class="browse-text">browse</span></p>
+                    <input type="file" id="file-input" accept="image/*" hidden>
+                </div>
+                
+                <div class="preview-container" id="preview-container" style="display: none;">
+                    <img id="image-preview" src="" alt="Preview">
+                    <div class="control-buttons">
+                        <button id="reset-btn" class="secondary-btn">Reset</button>
+                        <button id="process-btn" class="primary-btn">Process Image</button>
+                    </div>
+                </div>
+            </section>
+
+            <section class="processing-options" id="processing-options" style="display: none;">
+                <h2>Noise Removal Options</h2>
+                <div class="options-container">
+                    <div class="option">
+                        <input type="radio" id="full-image" name="removal-area" value="full" checked>
+                        <label for="full-image">Full Image</label>
+                    </div>
+                    <div class="option">
+                        <input type="radio" id="background-only" name="removal-area" value="background">
+                        <label for="background-only">Background Only</label>
+                    </div>
+                    <div class="option">
+                        <input type="radio" id="custom-area" name="removal-area" value="custom">
+                        <label for="custom-area">Custom Area</label>
+                    </div>
+                </div>
+                
+                <div id="custom-area-controls" style="display: none;">
+                    <p>Click and drag on the image to select an area</p>
+                </div>
+            </section>
+
+            <section class="results-section" id="results-section" style="display: none;">
+                <div class="comparison-view">
+                    <div class="image-container">
+                        <h3>Original</h3>
+                        <img id="original-image" src="" alt="Original Image">
+                    </div>
+                    <div class="image-container">
+                        <h3>Processed</h3>
+                        <img id="processed-image" src="" alt="Processed Image">
+                    </div>
+                </div>
+                
+                <div class="filters-section">
+                    <h3>Apply Filters</h3>
+                    <div class="filters-container">
+                        <div class="filter-option" data-filter="none">
+                            <div class="filter-preview">None</div>
+                            <p>Original</p>
+                        </div>
+                        <div class="filter-option" data-filter="aftereffects">
+                            <div class="filter-preview">AE</div>
+                            <p>After Effects</p>
+                        </div>
+                        <div class="filter-option" data-filter="afterglow">
+                            <div class="filter-preview">AG</div>
+                            <p>Afterglow</p>
+                        </div>
+                        <div class="filter-option" data-filter="cinematic">
+                            <div class="filter-preview">CM</div>
+                            <p>Cinematic</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="download-section">
+                    <button id="download-btn" class="primary-btn">Download Image</button>
+                </div>
+            </section>
+
+            <div class="loading-indicator" id="loading-indicator" style="display: none;">
+                <div class="spinner"></div>
+                <p>Processing your image with AI...</p>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2025 AI Noise Removal Tool</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
