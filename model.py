@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
-from scipy import ndimage
+import tensorflow as tf
+from tensorflow.keras.layers import Input, Conv2D, MaxPooling2D, UpSampling2D
+from tensorflow.keras.models import Model
 
 class NoiseRemovalModel:
     def __init__(self, model_path=None):
@@ -12,22 +14,56 @@ class NoiseRemovalModel:
         """
         self.model_loaded = False
         
-        # Load model if path is provided
         if model_path:
             try:
-                # In a real implementation, this would load a neural network model
-                # such as a denoising autoencoder or U-Net from a saved file
-                print(f"Loading model from {model_path}")
+                # Load a pre-trained Denoising Autoencoder
+                self.model = self._build_autoencoder()
+                self.model.load_weights(model_path)
                 self.model_loaded = True
+                print(f"Model loaded from {model_path}")
             except Exception as e:
                 print(f"Error loading model: {e}")
-                
-        print("Noise removal model initialized")
+                self.model_loaded = False
+        else:
+            # Build a new model if no path is provided
+            self.model = self._build_autoencoder()
+            print("New model initialized (not trained)")
+    
+    def _build_autoencoder(self):
+        """
+        Build a Denoising Autoencoder model.
+        
+        Returns:
+            A TensorFlow/Keras model
+        """
+        # Input layer
+        input_img = Input(shape=(256, 256, 3))  # Adjust input size as needed
+        
+        # Encoder
+        x = Conv2D(64, (3, 3), activation='relu', padding='same')(input_img)
+        x = MaxPooling2D((2, 2), padding='same')(x)
+        x = Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+        x = MaxPooling2D((2, 2), padding='same')(x)
+        x = Conv2D(256, (3, 3), activation='relu', padding='same')(x)
+        encoded = MaxPooling2D((2, 2), padding='same')(x)
+        
+        # Decoder
+        x = Conv2D(256, (3, 3), activation='relu', padding='same')(encoded)
+        x = UpSampling2D((2, 2))(x)
+        x = Conv2D(128, (3, 3), activation='relu', padding='same')(x)
+        x = UpSampling2D((2, 2))(x)
+        x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+        x = UpSampling2D((2, 2))(x)
+        decoded = Conv2D(3, (3, 3), activation='sigmoid', padding='same')(x)
+        
+        # Autoencoder model
+        autoencoder = Model(input_img, decoded)
+        autoencoder.compile(optimizer='adam', loss='mse')  # Mean Squared Error loss
+        return autoencoder
     
     def remove_noise(self, image):
         """
-        Remove noise from the entire image using either the loaded AI model
-        or traditional CV techniques as fallback.
+        Remove noise from the image using the Denoising Autoencoder.
         
         Args:
             image: Input image (numpy array)
@@ -35,13 +71,24 @@ class NoiseRemovalModel:
         Returns:
             Denoised image (numpy array)
         """
-        if self.model_loaded:
-            # Use AI model for denoising
-            # This would be replaced with actual model inference in production
-            return self._simulate_ai_denoising(image)
-        else:
-            # Use traditional CV methods as fallback
+        if not self.model_loaded:
+            print("Model not loaded. Using traditional denoising as fallback.")
             return self._traditional_denoising(image)
+        
+        # Preprocess the image
+        resized_image = cv2.resize(image, (256, 256))  # Resize to model input size
+        normalized_image = resized_image / 255.0  # Normalize to [0, 1]
+        input_image = np.expand_dims(normalized_image, axis=0)  # Add batch dimension
+        
+        # Predict the denoised image
+        denoised_image = self.model.predict(input_image)
+        
+        # Postprocess the image
+        denoised_image = np.squeeze(denoised_image, axis=0)  # Remove batch dimension
+        denoised_image = (denoised_image * 255).astype(np.uint8)  # Scale back to [0, 255]
+        denoised_image = cv2.resize(denoised_image, (image.shape[1], image.shape[0]))  # Resize to original size
+        
+        return denoised_image
     
     def remove_background_noise(self, image):
         """
@@ -83,70 +130,11 @@ class NoiseRemovalModel:
         Returns:
             Denoised image (numpy array)
         """
-        # Apply a combination of techniques for better results
-        
-        # Convert to grayscale if it's a color image
-        is_color = len(image.shape) == 3
-        if is_color:
-            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray_image = image
-        
-        # 1. Non-local means denoising (works well for Gaussian noise)
-        denoised = cv2.fastNlMeansDenoising(gray_image, None, h=10, searchWindowSize=21, templateWindowSize=7)
-        
-        if is_color:
-            # For color images, use the color version of non-local means
-            denoised_color = cv2.fastNlMeansDenoisingColored(image, None, h=10, hColor=10, 
-                                                              searchWindowSize=21, templateWindowSize=7)
-            
-            # 2. Apply bilateral filter to preserve edges while removing noise
-            bilateral = cv2.bilateralFilter(denoised_color, d=9, sigmaColor=75, sigmaSpace=75)
-            
-            # Combine results
-            result = bilateral
-        else:
-            # 2. Apply bilateral filter to preserve edges while removing noise
-            bilateral = cv2.bilateralFilter(denoised, d=9, sigmaColor=75, sigmaSpace=75)
-            
-            # Combine results
-            result = bilateral
-        
-        return result
-    
-    def _simulate_ai_denoising(self, image):
-        """
-        Simulate AI-based denoising using advanced OpenCV techniques.
-        In a production environment, this would be replaced with an actual neural network.
-        
-        Args:
-            image: Input image (numpy array)
-            
-        Returns:
-            Denoised image (numpy array)
-        """
-        # Apply a combination of denoising techniques to simulate AI results
-        
-        # 1. Apply non-local means denoising (higher quality parameters)
-        if len(image.shape) == 3:
-            denoised = cv2.fastNlMeansDenoisingColored(image, None, h=10, hColor=10, 
-                                                       searchWindowSize=21, templateWindowSize=7)
-        else:
-            denoised = cv2.fastNlMeansDenoising(image, None, h=10, searchWindowSize=21, templateWindowSize=7)
-        
-        # 2. Apply bilateral filter with careful parameters to preserve edges
-        bilateral = cv2.bilateralFilter(denoised, d=9, sigmaColor=75, sigmaSpace=75)
-        
-        # 3. Apply slight sharpening to enhance details
-        kernel = np.array([[-1, -1, -1],
-                           [-1,  9, -1],
-                           [-1, -1, -1]])
-        sharpened = cv2.filter2D(bilateral, -1, kernel)
-        
-        # 4. Apply a very slight Gaussian blur to remove any sharpening artifacts
-        result = cv2.GaussianBlur(sharpened, (3, 3), 0.5)
-        
-        return result
+        if len(image.shape) == 3:  # Color image
+            denoised = cv2.fastNlMeansDenoisingColored(image, None, h=10, hColor=10, templateWindowSize=7, searchWindowSize=21)
+        else:  # Grayscale image
+            denoised = cv2.fastNlMeansDenoising(image, None, h=10, templateWindowSize=7, searchWindowSize=21)
+        return denoised
     
     def _segment_foreground(self, image):
         """
@@ -164,33 +152,15 @@ class NoiseRemovalModel:
         else:
             gray = image
         
-        # Apply GrabCut algorithm for automatic foreground extraction
-        # For simplicity in this example, we'll use a threshold-based approach
-        # In a real implementation, you'd want to use a more sophisticated segmentation model
-        
-        # Method 1: Simple thresholding with Otsu's method
+        # Apply Otsu's thresholding
         _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         
-        # Method 2: Use edge detection to find objects
-        edges = cv2.Canny(gray, 50, 150)
-        
-        # Fill in the holes in the edge map
-        dilated_edges = cv2.dilate(edges, None, iterations=2)
-        
-        # Find connected components (objects)
-        contours, _ = cv2.findContours(dilated_edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        
-        # Create a mask for foreground
-        mask = np.zeros_like(gray)
-        
-        # Fill in the contours (potential foreground objects)
-        for contour in contours:
-            # Filter out small contours (noise)
-            if cv2.contourArea(contour) > 500:  # Minimum area threshold
-                cv2.drawContours(mask, [contour], 0, 255, -1)
+        # Morphological operations to clean up the mask
+        kernel = np.ones((5, 5), np.uint8)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel, iterations=2)
+        thresh = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
         
         # Normalize mask to range [0, 1]
-        mask = mask / 255.0
+        mask = thresh / 255.0
         
         return mask
-        
